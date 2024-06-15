@@ -14,11 +14,12 @@
   font-family: 'Montserrat', sans-serif;
 }
 body{
-  background:linear-gradient(rgb(238, 208, 159),rgb(226, 162, 79));
+  background:linear-gradient(270deg,#df8908 10%,#b415ff 100%);
   background-size: cover;
 }
 .wrapper {
   display:flex;
+  flex-direction: column;
   justify-content:center;
   align-items: center;
   height:100vh;
@@ -103,6 +104,11 @@ button {
   </head>
 <body>
     <div class="wrapper">
+      <% if (errorMessage.length > 0) { %>
+        <div class="alert alert-danger" role="alert">
+            <%= errorMessage %>
+        </div>
+    <% } %>
         <div class="login-box">
           <form action="/signinsubmit" id="signupForm" method="POST">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">

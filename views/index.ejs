@@ -1,29 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <script src="https://cdn.tailwindcss.com"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sports Scheduler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body{
-            background-image: url('https://wallpapercave.com/wp/wp4390828.jpg');
-            background-size: cover;
-            background-repeat: no-repeat;
+      /* Global Styles */
+      body {
+        font-family: poppins;
+        background-color: #e2e2e2;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        width: 80%;
+        margin: auto;
+        overflow: hidden;
+      }
+
+      /* Header Styles */
+      header {
+        background: linear-gradient(to right, #56ccf2, #2f80ed);
+        color: white;
+        padding-top: 30px;
+        min-height: 70px;
+        border-bottom: #333 3px solid;
+      }
+
+      header a {
+        color: #ffffff;
+        text-decoration: none;
+        text-transform: uppercase;
+        font-size: 16px;
+      }
+
+      header ul {
+        padding: 0;
+        list-style: none;
+      }
+
+      header li {
+        float: left;
+        display: inline;
+        padding: 0 20px 0 20px;
+      }
+
+      header #branding {
+        float: left;
+      }
+
+      header #branding h1 {
+        margin: 0;
+      }
+
+      header nav {
+        float: right;
+        margin-top: 10px;
+      }
+
+      /* Showcase Styles */
+      #showcase {
+        min-height: 400px;
+        background: url("your-image-url.jpg") no-repeat center center/cover; /* Adjust image URL */
+        text-align: center;
+        color: #1f1a1a;
+      }
+
+      #showcase h1 {
+        margin-top: 100px;
+        font-size: 55px;
+        margin-bottom: 10px;
+      }
+
+      #showcase p {
+        font-size: 20px;
+      }
+
+      /* Box Styles */
+      #boxes .box {
+        float: left;
+        width: 30%;
+        padding: 10px;
+        text-align: center;
+      }
+
+      #boxes .box img {
+        width: 90px;
+      }
+
+      /* Footer Styles */
+      footer {
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        padding: 30px;
+        margin-top: 30px;
+      }
+
+      /* Media Queries for Responsive Design */
+      @media (max-width: 768px) {
+        header #branding,
+        header nav,
+        header nav ul,
+        header nav ul li,
+        #boxes .box,
+        footer p {
+          float: none;
+          text-align: center;
+          width: auto;
         }
+
+        header nav ul,
+        header nav ul li {
+          display: block;
+        }
+
+        #boxes .box {
+          width: auto;
+          margin-bottom: 20px;
+        }
+      }
     </style>
-</head>
-<body class="flex items-center justify-center h-screen bg-gray-100"> <!-- Centered content vertically and horizontally -->
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div id="branding">
+          <h1><span class="highlight">Sports</span> Scheduler</h1>
+        </div>
+        <nav>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/signup">Sign up</a></li>
+            <li><a href="/signin">Login</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
 
-    <!-- Todo Home Page -->
-    <div class="col-start-3 col-span-2 bg-white p-6 rounded-lg shadow-md"> <!-- Removed unnecessary mt-20 -->
-        <p class="py-2 text-2xl font-semibold">Welcome to Sports Scheduler</p>
-        <p class="py-2">New Here? <a class="text-green-600" href="/signup">Sign-Up now...</a></p>
-        <p class="py-2">Already have an Account? <a class="text-green-600" href="/login">Sign-In</a></p>
-    </div>
+    <section id="showcase">
+      <div class="container">
+        <h1>Welcome to the Sports Scheduler!</h1>
+        <p>Join and manage your sports events with ease.</p>
+      </div>
+    </section>
 
-</body>
+    <section id="boxes">
+      <div class="container">
+        <div class="box">
+          <img src="https://png.pngtree.com/png-vector/20230302/ourmid/pngtree-event-management-line-icon-vector-png-image_6626145.png" />
+          <h3>Event Management</h3>
+          <p>Create, join, and keep track of your events effortlessly.</p>
+        </div>
+        <div class="box">
+          <img src="https://c1.klipartz.com/pngpicture/823/765/sticker-png-login-icon-system-administrator-user-user-profile-icon-design-avatar-face-head.png" />
+          <h3>User Profiles</h3>
+          <p>Customize your profile and connect with other players.</p>
+        </div>
+        <div class="box">
+          <img src="https://i.pinimg.com/originals/50/53/e5/5053e50d44b104d89bd4d6f1358cb632.png" />
+          <h3>24/7 Support</h3>
+          <p>Our team is always here to help you with any issues.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="bg-light text-center text-lg-start">
+        <div class="container p-4">
+            <div class="row">
+                <div class="col-lg-6 col-md-12 mb-4 mb-md-0">
+                    <h5 class="text-uppercase">Sports Scheduler</h5>
+                    <p>Sports Scheduler, ©2024</p>
+                </div>
+
+                <div class="col-lg-6 col-md-12 mb-4 mb-md-0 text-end">
+                    <a href="tel:+1234567890" class="me-3">
+                        <i class="fas fa-phone-alt"></i>
+                    </a>
+                    <a href="https://www.google.com" target="_blank">
+                        <i class="fab fa-google"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+  </body>
 </html>
