@@ -1,141 +1,327 @@
-const request = require('supertest');
+const express = require('express');
 const bcrypt = require('bcrypt');
-const app = require('./app');
-const db = require('./models');
+const csrf = require('csurf');
+const bodyParser = require('body-parser');
+const { User, Event, PlayerEvent } = require('./models');
+const cookieParser = require('cookie-parser');
+const path = require('path');
+const app = express();
+const saltRounds = 10;
+const flash = require('connect-flash');
+const passport = require("passport");
+const connectEnsureLogin = require("connect-ensure-login");
+const session = require("express-session");
+const LocalStrategy = require("passport-local").Strategy;
 
-// Helper function to create a hashed password
-const hashPassword = async (password) => {
-  const hashedPwd = await bcrypt.hash(password, 10);
-  return hashedPwd;
-};
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(csrf({ cookie: true }));
+app.use(flash());
 
-describe('Sports-Scheduler Application', () => {
-  let server, agent;
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-  beforeAll(async () => {
-    // Ensure the database is synchronized and server is started
-    await db.sequelize.sync({ force: true }); // Sync database schema
-  server = app.listen(4000, () => {
-    console.log('Server started on port 4000');
-  });
-  agent = request.agent(server);
-  });
+app.use(session({
+  secret: 'my-secret-key-12345678',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+}));
 
-  afterAll(async () => {
-    // Close server and database connections
-    if (server) await server.close();
-    await db.close();
-  });
+app.use(passport.initialize());
+app.use(passport.session());
 
-  beforeEach(async () => {
-    // Clear any session data before each test
-    await agent.get('/logout');
-  });
+// Passport configuration
+passport.use(new LocalStrategy({
+  usernameField: 'email',
+  passwordField: 'password',
+}, async (username, password, done) => {
+  try {
+    const user = await User.findOne({ where: { email: username } });
+    if (!user) {
+      return done(null, false, { message: 'User not found' });
+    }
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return done(null, false, { message: 'Invalid password' });
+    }
+    return done(null, user);
+  } catch (error) {
+    return done(error);
+  }
+}));
 
-  test('Admin Signup and Login', async () => {
-    // Admin signup
-    const resSignup = await agent
-      .post('/create-player')
-      .send({
-        firstName: 'Admin',
-        lastName: 'User',
-        email: 'admin@test.com',
-        password: await hashPassword('adminpassword'),
-        role: 'admin',
-      });
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
 
-    expect(resSignup.statusCode).toBe(200); // Assuming successful signup redirects to login page
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return done(null, false);
+    }
+    done(null, user);
+  } catch (error) {
+    done(error, false);
+  }
+});
 
-    // Admin login
-    const resLogin = await agent
-      .post('/signinsubmit')
-      .send({ email: 'admin@test.com', password: 'adminpassword' });
 
-    expect(resLogin.statusCode).toBe(302); // Expecting redirection after login
-    expect(resLogin.headers.location).toBe('/admindashboard'); // Check redirection to admin dashboard
-  });
+app.use((req, res, next) => {
+  res.locals.errorMessage = req.flash('error');
+  next();
+});
 
-  test('Player Signup and Login', async () => {
-    // Player signup
-    const resSignup = await agent
-      .post('/create-player')
-      .send({
-        firstName: 'Player',
-        lastName: 'User',
-        email: 'player@test.com',
-        password: await hashPassword('playerpassword'),
-        role: 'player',
-      });
 
-    expect(resSignup.statusCode).toBe(200); // Assuming successful signup redirects to login page
+// Routes
+app.get('/signup', (req, res) => {
+  res.render('signup', { csrfToken: req.csrfToken() });
+});
 
-    // Player login
-    const resLogin = await agent
-      .post('/signinsubmit')
-      .send({ email: 'player@test.com', password: 'playerpassword' });
-
-    expect(resLogin.statusCode).toBe(302); // Expecting redirection after login
-    expect(resLogin.headers.location).toBe('/playerdashboard'); // Check redirection to player dashboard
-  });
-
-  test('Admin Create Event', async () => {
-    // Admin login (if not already logged in)
-    await agent.post('/signinsubmit').send({ email: 'admin@test.com', password: 'adminpassword' });
-
-    // Create event
-    const resCreateEvent = await agent
-      .post('/create-event')
-      .send({
-        title: 'Test Event',
-        date: '2024-06-30',
-        time: '14:00',
-        venue: 'Test Venue',
-        team_limit: 10,
-        description: 'This is a test event',
-      });
-
-    expect(resCreateEvent.statusCode).toBe(302); // Expecting redirection after event creation
-    expect(resCreateEvent.headers.location).toBe('/admindashboard'); // Check redirection to admin dashboard
-
-    // Verify event creation in the database (optional, based on your needs)
-    const events = await Event.findAll();
-    expect(events.length).toBe(1); // Assuming only one event is created in this test
-  });
-
-  test('Player Join Event', async () => {
-    // Player login (if not already logged in)
-    await agent.post('/signinsubmit').send({ email: 'player@test.com', password: 'playerpassword' });
-
-    // Create an event first (assuming this event exists)
-    const event = await Event.create({
-      title: 'Test Event',
-      date: '2024-06-30',
-      time: '14:00',
-      venue: 'Test Venue',
-      team_limit: 10,
-      description: 'This is a test event',
-      adminId: 1, // Replace with adminId based on your test setup
-    });
-
-    // Join event
-    const resJoinEvent = await agent.post(`/join-event/${event.id}`);
-
-    expect(resJoinEvent.statusCode).toBe(302); // Expecting redirection after joining event
-    expect(resJoinEvent.headers.location).toBe('/playerdashboard'); // Check redirection to player dashboard
-
-    // Verify player's participation in the event (optional, based on your needs)
-    const playerEvents = await PlayerEvent.findAll({ where: { playerId: 1 /* Replace with playerId */, eventId: event.id } });
-    expect(playerEvents.length).toBe(1); // Assuming only one player event entry is created in this test
-  });
-
-  test('Logout', async () => {
-    // Login first (admin or player)
-    await agent.post('/signinsubmit').send({ email: 'admin@test.com', password: 'adminpassword' });
-
-    // Logout
-    const resLogout = await agent.get('/logout');
-
-    expect(resLogout.statusCode).toBe(302); // Expecting redirection after logout
-    expect(resLogout.headers.location).toBe('/'); // Check redirection to home page
+app.get("/", (req, res) => {
+  res.render("index", {
+    csrfToken: req.csrfToken(),
   });
 });
+
+app.post('/create-player', async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, role } = req.body;
+
+    if (!firstName || !lastName || !email || !password || !role) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    const hashedPwd = await bcrypt.hash(password, saltRounds);
+
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: hashedPwd,
+      role
+    });
+
+    res.render("login", { csrfToken: req.csrfToken() });
+  } catch (error) {
+    console.error('Error creating user:', error.message);
+    res.status(500).json({ error: 'User may already exist or Internal server error' });
+  }
+});
+
+app.get('/signin', (req, res) => {
+  res.render('login', { csrfToken: req.csrfToken() });
+});
+
+app.post('/signinsubmit', passport.authenticate('local', {
+  failureRedirect: '/signin',
+  failureFlash: true,
+}), (req, res) => {
+  if (req.user.role === 'admin') {
+    res.redirect('/admindashboard');
+  } else if (req.user.role === 'player') {
+    res.redirect('/playerdashboard');
+  } else {
+    res.status(403).send('Unauthorized');
+  }
+});
+
+// Route to render create event form
+app.get('/create-event', connectEnsureLogin.ensureLoggedIn(), (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+  res.render('create-event', { csrfToken: req.csrfToken() });
+});
+
+// Route to handle event creation
+app.post('/create-event', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const { title, date, time, venue, team_limit, description } = req.body;
+
+    const newEvent = await Event.create({
+      title,
+      date,
+      time,
+      venue,
+      team_limit,
+      description,
+      adminId: req.user.id
+    });
+
+    res.redirect('/admindashboard');
+  } catch (error) {
+    console.error('Error creating event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to render edit event form
+app.get('/edit-event/:id', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const event = await Event.findOne({ where: { id: req.params.id, adminId: req.user.id } });
+
+    if (!event) {
+      return res.status(404).send('Event not found');
+    }
+
+    res.render('edit-event', { event, csrfToken: req.csrfToken() });
+  } catch (error) {
+    console.error('Error fetching event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to handle event editing
+app.post('/edit-event/:id', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const { title, date, time, venue, team_limit, description } = req.body;
+    const event = await Event.findOne({ where: { id: req.params.id, adminId: req.user.id } });
+
+    if (!event) {
+      return res.status(404).send('Event not found');
+    }
+
+    event.title = title;
+    event.date = date;
+    event.time = time;
+    event.venue = venue;
+    event.team_limit = team_limit;
+    event.description = description;
+
+    await event.save();
+
+    res.redirect('/admindashboard');
+  } catch (error) {
+    console.error('Error updating event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to handle event deletion
+app.post('/delete-event/:id', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const event = await Event.findOne({ where: { id: req.params.id, adminId: req.user.id } });
+
+    if (!event) {
+      return res.status(404).send('Event not found');
+    }
+
+    await event.destroy();
+
+    res.redirect('/admindashboard');
+  } catch (error) {
+    console.error('Error deleting event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to render admin dashboard with events
+app.get('/admindashboard', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const events = await Event.findAll({ where: { adminId: req.user.id } });
+    res.render('admindashboard', { User: req.user,events, csrfToken: req.csrfToken() });
+  } catch (error) {
+    console.error('Error fetching events:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to render player dashboard with all events and join/unjoin functionality
+app.get('/playerdashboard', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'player') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const events = await Event.findAll();
+    const joinedEvents = await PlayerEvent.findAll({ where: { playerId: req.user.id } });
+    const joinedEventIds = joinedEvents.map(je => je.eventId);
+
+    res.render('playerdashboard', { User: req.user,events, joinedEventIds, csrfToken: req.csrfToken() });
+  } catch (error) {
+    console.error('Error fetching events:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Route to handle joining an event
+app.post('/join-event/:id', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'player') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const { id } = req.params;
+    const event = await Event.findByPk(id);
+
+    if (!event) {
+      return res.status(404).send('Event not found');
+    }
+
+    await PlayerEvent.create({ playerId: req.user.id, eventId: id });
+
+    res.redirect('/playerdashboard');
+  } catch (error) {
+    console.error('Error joining event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+
+app.post('/unjoin-event/:id', connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  if (req.user.role !== 'player') {
+    return res.status(403).send('Unauthorized');
+  }
+
+  try {
+    const { id } = req.params;
+    const playerEvent = await PlayerEvent.findOne({ where: { playerId: req.user.id, eventId: id } });
+
+    if (!playerEvent) {
+      return res.status(404).send('Player is not joined to this event');
+    }
+
+    await playerEvent.destroy();
+
+    res.redirect('/playerdashboard');
+  } catch (error) {
+    console.error('Error unjoining event:', error.message);
+    res.status(500).send('Internal server error');
+  }
+});
+
+app.get('/logout', (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      console.error('Error logging out:', err);
+      return res.status(500).send('Internal server error');
+    }
+    res.redirect('/');
+  });
+});
+
+
+module.exports = app;
